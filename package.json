@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "tsx": "^4.19.3",
+    "viem": "^2.23.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9"
+  }
+}
