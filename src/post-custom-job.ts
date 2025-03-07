@@ -1,4 +1,5 @@
-import { createPublicClient, createWalletClient, decodeEventLog, erc20Abi, http, toHex } from "viem";
+import { exit } from "process";
+import { AbiEvent, createPublicClient, createWalletClient, decodeEventLog, erc20Abi, http, toHex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { registryAbi, treasuryAbi } from "./abi";
 import { network } from "./config";
@@ -57,7 +58,7 @@ async function approveTargetTokens(amount: bigint) {
 }
 
 // Submit a job
-async function submitJob() {
+async function submitJob(): Promise<string | null> {
   // example task data
   const taskData = toHex(
     "&EB+V,_70}XaJX5@{mED@0RY$#pAK;?%pfc@bYL(hJm7H.R5Y@MnD9kNGeYG=JwU2JV(D:UK%RzWVH09B3&ujqaGk*+P.YJXwi.P"
@@ -83,7 +84,7 @@ async function submitJob() {
   const receipt = await publicClient.waitForTransactionReceipt({ hash: tx });
 
   // find job id from event log
-  let jobId: unknown = null;
+  let jobId: string | null = null;
   for (const log of receipt.logs) {
     try {
       const decodedLog = decodeEventLog({
@@ -102,7 +103,52 @@ async function submitJob() {
 
   return jobId;
 }
+interface JobFinishedEventArgs {
+  job: {
+    id: string;
+    maxResults: number;
+  };
+  jobResult: {
+    data: string;
+    submitterCount: number;
+  };
+  totalSubmitterCount: number;
+}
 
-submitJob().then((jobId) => {
-  console.log(`successfully submitted job ${jobId}.`);
-});
+async function listenForJobResults(jobId: string) {
+  const jobFinishedEvent = registryAbi.find((item) => item.type === "event" && item.name === "JobFinished");
+  console.log(`Waiting for job results ...`);
+
+  publicClient.watchEvent<AbiEvent>({
+    address: registryAddress,
+    event: jobFinishedEvent,
+    onLogs: (logs) => {
+      logs.forEach((log) => {
+        if (log.eventName === "JobFinished") {
+          const event = log.args as unknown as JobFinishedEventArgs;
+          console.log(
+            `Job Result Received for Job ID ${jobId}:\ndata: ${event.jobResult.data}\nsubmitterCount:${event.jobResult.submitterCount}`
+          );
+          if (event.totalSubmitterCount >= event.job.maxResults) {
+            console.log("Job finished. Exiting.")
+            exit(0)
+          }
+        }
+      });
+    },
+  });
+}
+
+async function postJobAndWait() {
+  const jobId = await submitJob();
+
+  if (jobId == null) {
+    console.log("failed submitting job.");
+    return;
+  }
+
+  console.log(`Successfully submitted job ${jobId}.`);
+  await listenForJobResults(jobId);
+}
+
+postJobAndWait();
