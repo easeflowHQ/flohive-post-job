@@ -115,6 +115,9 @@ interface JobFinishedEventArgs {
   totalSubmitterCount: number;
 }
 
+// use the event log and an event watcher to wait for the respective job finished event
+// and quit if the event was found
+// Note: this will only finish if there is a node fulfilling your job
 async function listenForJobResults(jobId: string) {
   const jobFinishedEvent = registryAbi.find((item) => item.type === "event" && item.name === "JobFinished");
   console.log(`Waiting for job results ...`);
