@@ -10,7 +10,7 @@ npm install
 
 First adapt the `src/config.ts` to reflect your network configuration. Then start the script using:
 ```
-PRIVATE_KEY=<private_key> REGISTRY_ADDRESS=<registry_address> npx tx src/post-custom-job.ts
+PRIVATE_KEY=<private_key> REGISTRY_ADDRESS=<registry_address> npx tsx src/post-custom-job.ts
 ```
 
 Example Output

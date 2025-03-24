@@ -50,7 +50,7 @@ export const registryAbi = [
     ],
     name: "postJob",
     outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "payable",
     type: "function",
   },
   {

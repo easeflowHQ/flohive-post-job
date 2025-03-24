@@ -1,5 +1,14 @@
 import { exit } from "process";
-import { AbiEvent, createPublicClient, createWalletClient, decodeEventLog, erc20Abi, http, toHex } from "viem";
+import {
+  AbiEvent,
+  createPublicClient,
+  createWalletClient,
+  decodeEventLog,
+  erc20Abi,
+  http,
+  toHex,
+  zeroAddress,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { registryAbi, treasuryAbi } from "./abi";
 import { network } from "./config";
@@ -45,16 +54,22 @@ async function getTreasuryAddress() {
 // Approves target token spending.
 // The job poster sends target tokens, which are collected by the registry and locked through the treasury.
 // The locked tokens are used to pay execution on nodes.
-async function approveTargetTokens(amount: bigint) {
+async function approveTargetTokens(amount: bigint): bool {
   console.log("Approving token spending...");
   const targetTokenAddress = await getTargetTokenAdress();
 
-  await client.writeContract({
-    address: targetTokenAddress,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [registryAddress, amount],
-  });
+  if (targetTokenAddress != zeroAddress) {
+    await client.writeContract({
+      address: targetTokenAddress,
+      abi: erc20Abi,
+      functionName: "approve",
+      args: [registryAddress, amount],
+    });
+
+    return true
+  }
+
+  return false
 }
 
 // Submit a job
@@ -64,13 +79,13 @@ async function submitJob(): Promise<string | null> {
     "&EB+V,_70}XaJX5@{mED@0RY$#pAK;?%pfc@bYL(hJm7H.R5Y@MnD9kNGeYG=JwU2JV(D:UK%RzWVH09B3&ujqaGk*+P.YJXwi.P"
   );
   const jobType = "signature-scan-demo";
-  const reward = 1000n;
+  const reward = 100n;
   const nodeVersion = 1n;
   const maxResults = 10n;
   const minResultsForConsensus = 5n;
 
   // approve the target tokens before posting the job
-  await approveTargetTokens(reward);
+  const approvedTargetTokens = await approveTargetTokens(reward);
 
   console.log("Posting job...");
   const tx = await client.writeContract({
@@ -78,6 +93,7 @@ async function submitJob(): Promise<string | null> {
     abi: registryAbi,
     functionName: "postJob",
     args: [taskData, jobType, reward, nodeVersion, maxResults, minResultsForConsensus],
+    value: approvedTargetTokens ? 0n : reward,
   });
 
   console.log("Job submitted, transaction hash:", tx);
@@ -133,8 +149,8 @@ async function listenForJobResults(jobId: string) {
             `Job Result Received for Job ID ${jobId}:\ndata: ${event.jobResult.data}\nsubmitterCount:${event.jobResult.submitterCount}`
           );
           if (event.totalSubmitterCount >= event.job.maxResults) {
-            console.log("Job finished. Exiting.")
-            exit(0)
+            console.log("Job finished. Exiting.");
+            exit(0);
           }
         }
       });
