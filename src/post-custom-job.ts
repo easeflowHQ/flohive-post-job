@@ -7,6 +7,7 @@ import {
   erc20Abi,
   http,
   toHex,
+  webSocket,
   zeroAddress,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -28,6 +29,12 @@ const client = createWalletClient({
 const publicClient = createPublicClient({
   chain: network,
   transport: http(),
+});
+
+// create a websocket client for listening to events using wss://mawari-network-testnet.rpc.caldera.xyz/ws
+const wssClient = createPublicClient({
+  chain: network,
+  transport: webSocket("wss://mawari-network-testnet.rpc.caldera.xyz/ws"),
 });
 
 // retrieve the target token address for spending approval
@@ -138,7 +145,7 @@ async function listenForJobResults(jobId: string) {
   const jobFinishedEvent = registryAbi.find((item) => item.type === "event" && item.name === "JobFinished");
   console.log(`Waiting for job results ...`);
 
-  publicClient.watchEvent<AbiEvent>({
+  wssClient.watchEvent<AbiEvent>({
     address: registryAddress,
     event: jobFinishedEvent,
     onLogs: (logs) => {
